@@ -9,9 +9,10 @@ import argparse
 import os
 import re
 import sys
+import math
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Literal
 
 from .protocol import (
     TIERS,
@@ -32,16 +33,22 @@ from .protocol import (
 
 _CODE_MARKERS = re.compile(
     r"```|(?:^|\s)(?:def|class|function|SELECT|FROM|import|#include)\b|"
-    r"[{};]\s*$",
+    r"[{};]\s*$"
+    r"\b(?:assert|partition|startswith|isupper|return)\b", # 파이썬 코드 트레이스 키워드 추가
     re.IGNORECASE | re.MULTILINE,
 )
-_MATH_MARKERS = re.compile(r"[=+\-*/^∑∫√≈≠≤≥<>]|\\(?:frac|sum|int|sqrt)\b")
+_MATH_MARKERS = re.compile(
+    r"[=+\-*/^∑∫√≈≠≤≥<>]|\\(?:frac|sum|int|sqrt)\b"
+    r"\b(?:derivative|base\s+\d+|how\s+(?:much|many)|cost|paid)\b|\$\d+", # 미분, 진법, GSM8K 키워드 추가
+    re.IGNORECASE,
+)
 _NUMBER = re.compile(r"\d")
 _WORD = re.compile(r"[A-Za-z가-힣]+")
 _SENTENCE_END = re.compile(r"[.!?。！？]")
 _REASONING_WORDS = re.compile(
     r"\b(?:prove|derive|reason|analyze|explain why|algorithm|complexity|"
     r"증명|유도|추론|분석|알고리즘|복잡도)\b",
+    r"\bif\b.*?\bthen\b|\bquestion:\b|\bif\s+(?:someone|something)\b",# 명제 논리 추가
     re.IGNORECASE,
 )
 
@@ -118,7 +125,32 @@ def complexity_score(features: PromptFeatures) -> int:
         score += 1
     return score
 
+# raw_score를 0.0~1.0 범위로 정규화
+def normalize_complexity_score(
+    raw_score: float,
+    method: Literal["sigmoid", "minmax"]="sigmoid", # 'sigmoid' 또는 'minmax' 사용
+    midpoint: float=4.0, # sigmoid 사용 시 0.5 기준
+    steepness: float=0.75, # sigmoid 기울기
+    min_val: float=0.0, # min-max 0.0에 해당하는 최소 raw_score
+    max_val: float=10.0, # min-max 1.0에 해당하는 최대 raw_score
+) -> float:
 
+    if method == "sigmoid":
+        exponent= -steepness*(raw_score - midpoint)
+        safe_exponent=max(-500.0, min(500.0, exponent)) # overflow 방지
+        normalized=1.0/(1.0 + math.exp(safe_exponent))
+        return round(normalized, 6)
+
+    elif method == "minmax":
+        if max_val <= min_val:
+            return 0.5
+        scaled=(raw_score - min_val)/(max_val - min_val)
+        normalize=max(0.0, min(1.0, scaled))
+        return round(normalized, 6)
+
+    else:
+        raise ValueError("지원하지 않는 정규화 방식")
+        
 def select_model(features: PromptFeatures, tier: str) -> str:
     """Choose a model using fixed, intentionally conservative thresholds."""
 
@@ -221,6 +253,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     print(f"OK: {args.tier} 제출 파일을 생성했습니다.")
     return 0
 
+def get_prompt_score(episode) -> float:
+    features=extract_features(episode)
+    raw_score=complexity_score(features)
+    return normalize_complexity_score(raw_score)
 
 if __name__ == "__main__":
     raise SystemExit(main())
