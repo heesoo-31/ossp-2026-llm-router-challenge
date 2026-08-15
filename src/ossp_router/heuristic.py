@@ -47,7 +47,7 @@ _WORD = re.compile(r"[A-Za-z가-힣]+")
 _SENTENCE_END = re.compile(r"[.!?。！？]")
 _REASONING_WORDS = re.compile(
     r"\b(?:prove|derive|reason|analyze|explain why|algorithm|complexity|"
-    r"증명|유도|추론|분석|알고리즘|복잡도)\b",
+    r"증명|유도|추론|분석|알고리즘|복잡도)\b"
     r"\bif\b.*?\bthen\b|\bquestion:\b|\bif\s+(?:someone|something)\b",# 명제 논리 추가
     re.IGNORECASE,
 )
@@ -107,7 +107,9 @@ def complexity_score(features: PromptFeatures) -> int:
     score = 0
     if features.character_count >= 500:
         score += 1
-    if features.character_count >= 2_000:
+    if features.character_count >= 4_000:
+        score += 2
+    elif features.character_count >= 2_000:
         score += 1
     if features.long_context:
         score += 2
