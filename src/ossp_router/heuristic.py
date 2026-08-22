@@ -51,6 +51,9 @@ _REASONING_WORDS = re.compile(
     r"\bif\b.*?\bthen\b|\bquestion:\b|\bif\s+(?:someone|something)\b",# 명제 논리 추가
     re.IGNORECASE,
 )
+_FOR = re.compile(r"\bfor\b")
+_IF = re.compile(r"\bif\b")
+_WHILE = re.compile(r"\bwhile\b")
 
 
 @dataclass(frozen=True)
@@ -67,6 +70,10 @@ class PromptFeatures:
     numeric_density: float
     long_context: bool
     reasoning_marker_count: int
+    has_for: bool
+    has_if: bool
+    has_while: bool
+    control_flow_count: int
 
 
 def episode_text(episode: Episode) -> str:
@@ -87,6 +94,16 @@ def extract_features(episode: Episode) -> PromptFeatures:
     hangul = sum("\uac00" <= character <= "\ud7a3" for character in text)
     numbers = len(_NUMBER.findall(text))
     message_count = 1 if episode.prompt is not None else len(episode.messages or ())
+    has_for = bool(_FOR.search(text))
+    has_if = bool(_IF.search(text))
+    has_while = bool(_WHILE.search(text))
+
+    control_flow_count = (
+        int(has_for)
+        + int(has_if)
+        + int(has_while)
+    )
+    
     return PromptFeatures(
         character_count=characters,
         message_count=message_count,
@@ -98,6 +115,10 @@ def extract_features(episode: Episode) -> PromptFeatures:
         numeric_density=numbers / max(1, nonspace),
         long_context=characters >= 8_000,
         reasoning_marker_count=len(_REASONING_WORDS.findall(text)),
+        has_for=has_for,
+        has_if=has_if,
+        has_while=has_while,
+        control_flow_count=control_flow_count,
     )
 
 
@@ -125,6 +146,9 @@ def complexity_score(features: PromptFeatures) -> int:
         score += 1
     if features.word_count >= 350 or features.sentence_count >= 20:
         score += 1
+    if features.control_flow_count >= 2:
+        score += 1
+        
     return score
 
 # raw_score를 0.0~1.0 범위로 정규화
