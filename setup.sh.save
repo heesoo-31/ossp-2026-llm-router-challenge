@@ -1,0 +1,43 @@
+!/bin/bash
+
+echo "🚀 [OSSP 2026] 팀 환경 자동 세팅을 시작합니다..."
+
+# 0. OS별 파이썬 명령어 자동 감지 (Mac의 python3 문제 해결)
+if command -v python3 &>/dev/null; then
+    PYTHON_CMD="python3"
+else
+    PYTHON_CMD="python"
+fi
+
+# 1. 가상환경 생성
+echo "📦 1. \\ 환경(venv) 생성 중..."
+python -m venv venv
+
+# 2. 가상환경 활성화 및 패키지 설치 (Windows Git Bash & Mac 호환)
+echo "🔄 2. 필수 패키지 설치 중..."
+if [ -f "venv/Scripts/activate" ]; then
+    source venv/Scripts/activate
+else
+    source venv/bin/activate
+fi
+
+pip install --upgrade pip
+pip install -r data/sources/requirements-materialize-public-data.txt
+pip install -e .
+
+# 3. 데이터 준비
+echo "📊 3. Train / Dev 데이터 생성 중..."
+python tools/materialize_public_data.py
+
+# 4. 베이스라인 테스트 및 검증
+echo "🤖 4. 베이스라인 테스트 및 자동 검증(Self-check) 진행 중..."
+PYTHONPATH=src python baselines/always_light.py --input data/materialized/dev/inputs.json --output-dir build/dev-submission
+PYTHONPATH=src python -m ossp_router.cli self-check --input data/materialized/dev/inputs.json --outcomes data/dev/outcomes.json --submissions build/dev-submission --report build/dev-report.json
+
+echo "===================================================="
+echo "🎉 [성공] 모든 인프라 세팅과 검증이 완료되었습니다!"
+echo "👉 지금 바로 터미널에 아래 명령어를 입력하여 가상환경을 켜고 작업을 시작하세요!"
+echo "[Windows] source venv/Scripts/activate"
+echo "[Mac/Linux] source venv/bin/activate"
+echo "===================================================="
+

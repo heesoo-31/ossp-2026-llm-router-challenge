@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "challenge_id": "ossp-2026-llm-router-challenge",
+  "repository_url": "https://github.com/heesoo-31/ossp-2026-llm-router-challenge.git",
+  "commit_sha": "280218dec1c677531acd8bbcf00a1a5e8b840d47",
+  "image_digest": "ossp-router@sha256:c0ebe699e696e7a8a61aecbc23ff4641cbd7f0bf6a82346c7bcbdc89bde58b23",
+  "primary_license": "MIT"
+}
