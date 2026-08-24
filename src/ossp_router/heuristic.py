@@ -52,7 +52,6 @@ _REASONING_WORDS = re.compile(
     re.IGNORECASE,
 )
 
-
 @dataclass(frozen=True)
 class PromptFeatures:
     """Small set of directly computed, content-only features."""
@@ -68,6 +67,24 @@ class PromptFeatures:
     long_context: bool
     reasoning_marker_count: int
 
+MODEL_LIGHT = "ax31-light"
+MODEL_BASE = "ax31"
+MODEL_THINK = "axk1-think"
+
+THRESHOLDS = {
+    "Fast" : {
+        "tau_low": 0.9844,
+        "tau_high": 1.0000,
+    },
+    "Balanced" : {
+        "tau_low": 0.9651,
+        "tau_high": 0.9906,
+    },
+    "Premium" : {
+        "tau_low": 0.9651,
+        "tau_high": 0.9906,
+    }
+}
 
 def episode_text(episode: Episode) -> str:
     """Return only the prompt or message content available at routing time."""
@@ -152,26 +169,22 @@ def normalize_complexity_score(
 
     else:
         raise ValueError("지원하지 않는 정규화 방식")
-        
+ 
 def select_model(features: PromptFeatures, tier: str) -> str:
-    """Choose a model using fixed, intentionally conservative thresholds."""
-
     if tier not in TIERS:
         raise ProtocolError(f"알 수 없는 tier: {tier}")
-    score = complexity_score(features)
-    if tier == "fast":
-        return (
-            "ax31" if score >= 3 and not features.long_context else "ax31-light"
-        )
-    if tier == "balanced":
-        return (
-            "ax31" if score >= 2 and not features.long_context else "ax31-light"
-        )
-    # Without a learned output-length estimate, this deliberately weak baseline
-    # avoids the much less predictable think-model cost.
-    return "ax31"
+    
+    raw_score = complexity_score(features)
+    score = normalize_complexity_score(raw_score, midpoint=2.3606, steepness=0.5386)
 
-
+    th = THRESHOLDS[tier]
+    if score < th["tau_low"]:
+        return MODEL_LIGHT
+    elif score < th["tau_high"]:
+        return MODEL_BASE
+    else: 
+        return MODEL_THINK
+    
 def make_submission(
     inputs: InputBatch,
     policy: RoutingPolicy,
@@ -258,7 +271,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 def get_prompt_score(episode) -> float:
     features=extract_features(episode)
     raw_score=complexity_score(features)
-    return normalize_complexity_score(raw_score)
+    return normalize_complexity_score(
+        raw_score,
+        midpoint=2.3606,
+        steepness=0.5386,
+    )
 
 if __name__ == "__main__":
     raise SystemExit(main())
