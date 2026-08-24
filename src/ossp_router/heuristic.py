@@ -72,15 +72,15 @@ MODEL_BASE = "ax31"
 MODEL_THINK = "axk1-think"
 
 THRESHOLDS = {
-    "Fast" : {
+    "fast" : {
         "tau_low": 0.9844,
         "tau_high": 1.0000,
     },
-    "Balanced" : {
+    "balanced" : {
         "tau_low": 0.9651,
         "tau_high": 0.9906,
     },
-    "Premium" : {
+    "premium" : {
         "tau_low": 0.9651,
         "tau_high": 0.9906,
     }
